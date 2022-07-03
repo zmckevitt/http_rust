@@ -15,6 +15,7 @@ use std::io::{self, Read, Write};
 use std::str;
 use std::fs;
 
+const FILE:&str = "html/index.html";
 const BUFSIZE: usize = 512;
 
 
@@ -45,40 +46,22 @@ struct Request {
  */
 fn parse_request(http_request: &str) -> Request{
 
-    let tokens: Vec<&str> = http_request.split("\r\n").collect(); 
+    println!(http_request);
+    let tokens: Vec<&str> = http_request.split("\r\n").collect();
+    
     let first_line: Vec<&str> = tokens[0].split(" ").collect();
     let second_line: Vec<&str> = tokens[1].split(" ").collect();
-    let final_line: Vec<&str> = tokens[2].split(" ").collect();
+    let final_line: Vec<&str> = tokens[&tokens.len()-1].split(" ").collect();
     
     let req = Request {
-        req_type:  first_line[0].to_string(),
-        resource:  first_line[1].to_string(),
-        version:   first_line[2].to_string(),
+        req_type:  first_line[1].to_string(),
+        resource:  first_line[2].to_string(),
+        version:   first_line[3].to_string(),
         host_addr: second_line[1].to_string(),
         conn_type: final_line[1].to_string(),
     };
     
     req
-}
-
-fn get_conn_type(filename: &str) -> &str {
-    
-    let extension: Vec<&str> = filename.split(".").collect();
-    println!("{}", extension[1]);
-    match extension[1] {
-        
-        "html" => { "text/html" }
-        "css" =>  { "text/css" }
-        
-        "ico" => { "image/x-icon" }
-        "gif" => { "image/gif" }
-        "jpg" => { "image/jpeg"}
-        "png" => { "image/png" }
-
-        "js" =>  { "application/javascript" }
-
-        _ =>     { "text/html" }
-    }
 }
 
 /*
@@ -93,39 +76,29 @@ fn handle(mut stream: TcpStream) -> io::Result<()> {
     // parse the request
     let mut request_dat = [0 as u8; BUFSIZE];
     stream.read(&mut request_dat)?;
-    let request_str = str::from_utf8(&request_dat).unwrap();
-    let http_request: Request = parse_request(request_str);
+    let http_request: Request = parse_request(str::from_utf8(&request_dat).unwrap());
 
-    println!("Original Request:\n{}", request_str);
+    println!("{}", http_request.req_type); 
+    println!("{}", http_request.resource);
+    println!("{}", http_request.version);
+    println!("{}", http_request.host_addr);
+    println!("{}", http_request.conn_type);
 
     // declare buffer for writing html file to client
     let mut buffer = [0 as u8; BUFSIZE];
-   
+    
     // open file
-    let mut myfile;
-    let fname: String;
-    let cont_type: String;
-    if http_request.resource.eq("/") {
-        fname = "html/index.html".to_owned();
-        cont_type = "text/html".to_owned();
-        myfile = fs::File::open(&fname)?;
-    } else {
-        let mut path_to_res: String = "html/".to_owned();
-        path_to_res.push_str(&http_request.resource.to_owned());
-        fname = path_to_res;
-        cont_type = get_conn_type(&fname.to_string()).to_string();
-        myfile = fs::File::open(&fname.to_owned())?; 
-    }
+    let mut myfile = fs::File::open(FILE)?;
 
     // get size of file
-    let metadata = fs::metadata(fname);
+    let metadata = fs::metadata(FILE);
     let filesize = metadata.unwrap().len();
 
     // connstruct http header
-    let http_header = format!("HTTP/1.1 200 OK\r\nContent-Type:{}\r\nContent-Length:{}\r\n\
-                              Connection:{}\r\n\r\n", cont_type, filesize, http_request.conn_type);
+    let http_header = format!("HTTP/1.1 200 OK\r\nContent-Type:text/html\r\n\
+                      Content-Length:{}\r\nConnection:keep-alive\r\n\r\n", filesize);
     
-    println!("{}-------------------------------", http_header);
+    println!("{}", http_header);
     stream.write(&http_header.as_bytes()).unwrap();            
     
     loop {
